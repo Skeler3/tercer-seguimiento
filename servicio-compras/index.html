@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU Store · Consulta de tarjetas gráficas</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c232d;
+    --borde: #2a3340;
+    --texto: #e6edf3;
+    --suave: #8b98a8;
+    --acento: #4f9cff;
+    --ok: #2fbf71;
+    --agotado: #f0a43a;
+    --error: #ef5b5b;
+    --radio: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  .contenedor { max-width: 880px; margin: 0 auto; padding: 40px 20px 60px; }
+
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; }
+  header h1 span { color: var(--acento); }
+  header p { color: var(--suave); margin-top: 6px; }
+
+  .buscador {
+    background: var(--panel);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    padding: 24px;
+  }
+  .buscador form { display: flex; gap: 10px; }
+  .buscador input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 1rem;
+    color: var(--texto);
+    outline: none;
+    transition: border-color .15s;
+  }
+  .buscador input:focus { border-color: var(--acento); }
+  .buscador form button {
+    background: var(--acento);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0 26px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .buscador form button:hover { opacity: .9; }
+  .buscador form button:disabled { opacity: .5; cursor: wait; }
+
+  .sugerencias { margin-top: 16px; }
+  .sugerencias small { color: var(--suave); display: block; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    background: var(--panel-2);
+    border: 1px solid var(--borde);
+    color: var(--texto);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: .875rem;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .chip:hover { border-color: var(--acento); background: #1f2a38; }
+
+  /* Resultado */
+  #resultado { margin-top: 20px; }
+  .tarjeta {
+    background: var(--panel);
+    border: 1px solid var(--borde);
+    border-left: 5px solid var(--acento);
+    border-radius: var(--radio);
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    animation: aparecer .25s ease-out;
+  }
+  .tarjeta.ok { border-left-color: var(--ok); }
+  .tarjeta.agotado { border-left-color: var(--agotado); }
+  .tarjeta.error { border-left-color: var(--error); }
+  @keyframes aparecer { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .tarjeta .marca { color: var(--suave); font-size: .85rem; text-transform: uppercase; letter-spacing: 1px; }
+  .tarjeta .modelo { font-size: 1.5rem; font-weight: 700; }
+  .tarjeta .mensaje { color: var(--suave); margin-top: 4px; }
+  .tarjeta .derecha { text-align: right; white-space: nowrap; }
+  .tarjeta .precio { font-size: 1.6rem; font-weight: 700; }
+  .estado {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: .8rem;
+    font-weight: 600;
+  }
+  .estado.ok { background: rgba(47,191,113,.15); color: var(--ok); }
+  .estado.agotado { background: rgba(240,164,58,.15); color: var(--agotado); }
+
+  /* Historial */
+  .historial { margin-top: 40px; }
+  .historial-cabecera { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .historial h2 { font-size: 1.15rem; }
+  .historial-cabecera small { color: var(--suave); }
+  .tabla-wrap {
+    background: var(--panel);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { padding: 12px 16px; text-align: left; }
+  th { color: var(--suave); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; background: var(--panel-2); }
+  tr + tr td { border-top: 1px solid var(--borde); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  .vacio { padding: 28px; text-align: center; color: var(--suave); }
+  .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .punto.ok { background: var(--ok); }
+  .punto.agotado { background: var(--agotado); }
+  .punto.no { background: var(--error); }
+
+  footer { text-align: center; color: var(--suave); font-size: .8rem; margin-top: 40px; }
+
+  @media (max-width: 600px) {
+    .buscador form { flex-direction: column; }
+    .buscador form button { padding: 14px; }
+    .tarjeta { flex-direction: column; align-items: flex-start; }
+    .tarjeta .derecha { text-align: left; }
+    .ocultar-movil { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="contenedor">
+
+  <header>
+    <h1>GPU <span>Store</span></h1>
+    <p>Pregunta por una tarjeta gráfica y te decimos si la tenemos y cuánto cuesta.</p>
+  </header>
+
+  <section class="buscador">
+    <form id="form">
+      <input id="modelo" type="text" placeholder="Escribe un modelo, por ejemplo: RTX 4070" autocomplete="off" required minlength="2">
+      <button id="btn" type="submit">Consultar</button>
+    </form>
+    <div class="sugerencias">
+      <small>O elige una del catálogo:</small>
+      <div class="chips" id="chips"><span class="chip">Cargando…</span></div>
+    </div>
+  </section>
+
+  <div id="resultado"></div>
+
+  <section class="historial">
+    <div class="historial-cabecera">
+      <h2>Consultas recientes</h2>
+      <small id="total"></small>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Consulta</th>
+            <th>Resultado</th>
+            <th class="num">Precio</th>
+            <th class="ocultar-movil">Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="tabla"><tr><td colspan="4" class="vacio">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Micro 1 (compras) consulta al Micro 2 (inventario) · cada uno con su propia base de datos</footer>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const pesos = (n) => "$" + Number(n).toLocaleString("es-CO");
+  const escapar = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function mostrarResultado(d) {
+    let clase, html;
+    if (!d.encontrado) {
+      clase = "error";
+      html = `<div><div class="modelo">Sin resultados</div><div class="mensaje">${escapar(d.mensaje)}</div></div>`;
+    } else {
+      clase = d.disponible ? "ok" : "agotado";
+      const estado = d.disponible ? `Disponible · ${d.stock} en stock` : "Agotada";
+      html = `
+        <div>
+          <div class="marca">${escapar(d.marca)}</div>
+          <div class="modelo">${escapar(d.modelo)}</div>
+          <div class="mensaje">${escapar(d.mensaje)}</div>
+        </div>
+        <div class="derecha">
+          <div class="precio">${pesos(d.precio)}</div>
+          <span class="estado ${clase}">${estado}</span>
+        </div>`;
+    }
+    $("resultado").innerHTML = `<div class="tarjeta ${clase}">${html}</div>`;
+  }
+
+  function mostrarError(texto) {
+    $("resultado").innerHTML = `<div class="tarjeta error"><div><div class="modelo">Ups</div><div class="mensaje">${escapar(texto)}</div></div></div>`;
+  }
+
+  async function consultar(modelo) {
+    $("btn").disabled = true;
+    $("btn").textContent = "Consultando…";
+    try {
+      const r = await fetch("/consultas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelo })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "Error al consultar");
+      mostrarResultado(d);
+      cargarHistorial();
+    } catch (e) {
+      mostrarError(e.message);
+    } finally {
+      $("btn").disabled = false;
+      $("btn").textContent = "Consultar";
+    }
+  }
+
+  async function cargarHistorial() {
+    try {
+      const filas = await (await fetch("/consultas")).json();
+      $("total").textContent = filas.length ? `${filas.length} en total` : "";
+      if (!filas.length) {
+        $("tabla").innerHTML = `<tr><td colspan="4" class="vacio">Todavía no hay consultas. ¡Haz la primera!</td></tr>`;
+        return;
+      }
+      $("tabla").innerHTML = filas.slice(0, 15).map(f => {
+        let resultado;
+        if (!f.encontrado) resultado = `<span class="punto no"></span>No encontrada`;
+        else if (f.disponible) resultado = `<span class="punto ok"></span>${escapar(f.modelo)}`;
+        else resultado = `<span class="punto agotado"></span>${escapar(f.modelo)} (agotada)`;
+        const fecha = new Date(f.fecha).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" });
+        return `<tr>
+          <td>${escapar(f.modelo_consultado)}</td>
+          <td>${resultado}</td>
+          <td class="num">${f.precio != null ? pesos(f.precio) : "—"}</td>
+          <td class="ocultar-movil">${fecha}</td>
+        </tr>`;
+      }).join("");
+    } catch {
+      $("tabla").innerHTML = `<tr><td colspan="4" class="vacio">No se pudo cargar el historial.</td></tr>`;
+    }
+  }
+
+  async function cargarCatalogo() {
+    try {
+      const r = await fetch("/catalogo");
+      if (!r.ok) throw new Error();
+      const tarjetas = await r.json();
+      $("chips").innerHTML = tarjetas.map(t =>
+        `<button type="button" class="chip" data-modelo="${escapar(t.modelo)}">${escapar(t.modelo)}</button>`
+      ).join("");
+    } catch {
+      $("chips").innerHTML = `<span class="chip">Inventario no disponible</span>`;
+    }
+  }
+
+  $("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const modelo = $("modelo").value.trim();
+    if (modelo.length >= 2) consultar(modelo);
+  });
+
+  $("chips").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-modelo]");
+    if (!chip) return;
+    $("modelo").value = chip.dataset.modelo;
+    consultar(chip.dataset.modelo);
+  });
+
+  cargarCatalogo();
+  cargarHistorial();
+</script>
+</body>
+</html>

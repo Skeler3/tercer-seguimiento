@@ -1,0 +1,26 @@
+services:
+  inventario:
+    build: ./servicio-inventario
+    container_name: micro-inventario
+    ports:
+      - "5002:5002"
+    volumes:
+      - datos-inventario:/data
+
+  compras:
+    build: ./servicio-compras
+    container_name: micro-compras
+    ports:
+      - "5001:5001"
+    environment:
+      # Dentro de la red de Docker, el micro 1 encuentra al micro 2 por su nombre de servicio
+      - INVENTARIO_URL=http://inventario:5002
+    volumes:
+      - datos-compras:/data
+    depends_on:
+      - inventario
+
+# Cada microservicio tiene su propio volumen = su propia base de datos
+volumes:
+  datos-inventario:
+  datos-compras:
